@@ -267,15 +267,30 @@ class CredentialManager(Manager):
         logger.debug("Returning credentials as tuple.")
         return self.username, self.password
 
-    def __call__(self, **kwargs) -> Tuple[Optional[str], Optional[str]] or Dict[str, str]:
+    def as_uri(self) -> str:
         """
-        Return the credentials as a tuple or dictionary.
+        Return the credentials as a URI.
+
+        :return: The credentials as a URI.
+        :rtype: str
+        """
+        logger.debug("Returning credentials as URI.")
+        return f"{self.username}:{self.password}"
+
+    def __call__(self, **kwargs) -> str | Dict[str, str] | Tuple[Optional[str], Optional[str]]:
+        """
+        Return the credentials as a tuple (default) or dictionary or uri-style.
 
         :param kwargs: Additional arguments to control the return format.
         :return: The credentials as a tuple (username, password) or dictionary.
         :rtype: Tuple[Optional[str], Optional[str]] or Dict[str, str]
         """
-        return self.as_dict() if kwargs.get('as_dict', False) else self.as_tuple()
+        if kwargs.get('as_uri', False):
+            return self.as_uri()
+        if kwargs.get('as_dict', False):
+            return self.as_dict()
+        if kwargs.get('as_tuple', True):
+            return self.as_tuple()
 
 
 class TokenManager(Manager):

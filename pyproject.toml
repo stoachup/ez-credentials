@@ -15,19 +15,13 @@ keywords = ["credentials", "keyring"]
 packages = [{include = "ez_credentials"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.11,<3.13"
 keyring = "^25.2.1"
 pyjwt = "^2.8.0"
-pendulum = "^3.0.0"
+validators = "^0.33.0"
 loguru = "^0.7.2"
 yarl = "^1.9.4"
-validators = "^0.33.0"
-python-dotenv = "^1.0.1"
 requests = "^2.32.3"
-toml = "^0.10.2"
-pyyaml = "^6.0.1"
-click = "^8.1.7"
-python-benedict = "^0.33.2"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.3"

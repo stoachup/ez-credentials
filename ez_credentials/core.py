@@ -12,7 +12,6 @@ __status__ = 'Dev'
 import secrets
 import keyring
 import jwt
-import pendulum
 import getpass
 import requests
 import validators
@@ -75,7 +74,7 @@ class Manager:
         try:
             payload = {
                 'key': value,
-                'exp': pendulum.now('Europe/Brussels').add(seconds=expires_in)
+                'exp': datetime.utcnow() + timedelta(seconds=expires_in)
             }
             encoded_jwt = jwt.encode(payload, self.salt, algorithm='HS256')
             logger.debug(f"Value encoded with expiration in {expires_in} seconds.")

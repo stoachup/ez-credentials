@@ -385,7 +385,7 @@ class TokenManager(Manager):
 
     is_expired = is_token_expired
 
-    def __call__(self, **kwargs) -> str or Dict[str, str]:
+    def __call__(self, **kwargs) -> str | Dict[str, str]:
         """
         Return the token as a string or dictionary.
 

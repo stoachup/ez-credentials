@@ -14,13 +14,13 @@ import keyring
 import jwt
 import getpass
 import requests
-import validators
 from datetime import datetime, timedelta
 from typing import Tuple, Dict, Optional
 from yarl import URL
 from loguru import logger
 
 from .utils import URL
+from . import fromenv
 
 
 class Manager:
@@ -33,14 +33,16 @@ class Manager:
 
     def __init__(self, service_name, **kwargs):
         self.service_name = service_name
-        self.salt_key = f"{service_name}_salt"
+        storing = kwargs.get('store', 'keyring')
+        logger.debug(f"Using {storing} for storing credentials.")
+        self.store = keyring if storing == 'keyring' else fromenv
 
-        self.salt = keyring.get_password(self.service_name, self.salt_key)
+        self.salt = self.store.get_password(self.service_name, 'salt')
         if self.salt is None:
             salt = secrets.token_hex()
             logger.debug("Salt generated.")
             try:
-                keyring.set_password(self.service_name, self.salt_key, salt)
+                self.store.set_password(self.service_name, 'salt', salt)
                 logger.debug("New salt stored in keyring.")
             except Exception as e:
                 logger.error(f"Failed to store salt in keyring: {e}")
@@ -55,7 +57,7 @@ class Manager:
         Reset the keyring for the service.
         """
         try:
-            keyring.delete_password(self.service_name, self.salt_key)
+            self.store.delete_password(self.service_name, 'salt')
         except keyring.errors.PasswordDeleteError:
             pass
 
@@ -118,8 +120,6 @@ class CredentialManager(Manager):
     def __init__(self, service_name: str, **kwargs):
         Manager.__init__(self, service_name, **kwargs)
         self.credential_expires_in = kwargs.get('credential_expires_in', kwargs.get('expires_in', 30 * 24 * 60 * 60))
-        self.username_key = f"{service_name}_username"
-        self.password_key = f"{service_name}_password"
         logger.debug(f"CredentialManager initialized ({self.credential_expires_in}s).")
 
     def reset_password(self):
@@ -127,7 +127,7 @@ class CredentialManager(Manager):
         Reset the keyring for the password.
         """
         try:
-            keyring.delete_password(self.service_name, self.password_key)
+            self.store.delete_password(self.service_name, 'password')
         except keyring.errors.PasswordDeleteError:
             pass
 
@@ -137,7 +137,7 @@ class CredentialManager(Manager):
         """
         self.reset_password()
         try:
-            keyring.delete_password(self.service_name, self.username_key)
+            self.store.delete_password(self.service_name, 'username')
         except keyring.errors.PasswordDeleteError:
             pass
 
@@ -158,7 +158,7 @@ class CredentialManager(Manager):
         :rtype: Optional[str]
         """
         logger.debug("Retrieving username from keyring.")
-        username = keyring.get_password(self.service_name, self.username_key)
+        username = self.store.get_password(self.service_name, 'username')
         if username is None:
             logger.warning("No username found. Prompting for defining one...")
             username = self.prompt_for_username()
@@ -176,11 +176,11 @@ class CredentialManager(Manager):
         :type value: str
         """
         logger.debug(f"Setting username to {value}.")
-        if value != keyring.get_password(self.service_name, self.username_key):
+        if value != self.store.get_password(self.service_name, 'username'):
             self.reset_password()
             logger.debug("Existing password deleted as username changed.")
         try:
-            keyring.set_password(self.service_name, self.username_key, value)
+            self.store.set_password(self.service_name, 'username', value)
             logger.debug("Username stored in keyring.")
         except Exception as e:
             logger.error(f"Failed to store username in keyring: {e}")
@@ -202,7 +202,7 @@ class CredentialManager(Manager):
         :rtype: Optional[str]
         """
         password = None
-        if encoded_password := keyring.get_password(self.service_name, self.password_key):
+        if encoded_password := self.store.get_password(self.service_name, 'password'):
             logger.debug("Password found in keyring.")
             password = self._decode(encoded_password)
 
@@ -223,7 +223,7 @@ class CredentialManager(Manager):
         """
         try:
             encoded_password = self._encode(value, self.credential_expires_in)
-            keyring.set_password(self.service_name, self.password_key, encoded_password)
+            self.store.set_password(self.service_name, 'password', encoded_password)
             logger.debug("Password stored in keyring.")
         except Exception as e:
             logger.error(f"Failed to store password in keyring: {e}")
@@ -235,7 +235,7 @@ class CredentialManager(Manager):
         :return: True if the password is expired, False otherwise.
         :rtype: bool
         """
-        if encoded_password := keyring.get_password(self.service_name, self.password_key):
+        if encoded_password := self.store.get_password(self.service_name, 'password'):
             if self._decode(encoded_password) is None:
                 logger.warning("Password is expired.")
                 return True
@@ -304,7 +304,6 @@ class TokenManager(Manager):
     def __init__(self, service_name: str, **kwargs):
         Manager.__init__(self, service_name, **kwargs)
         self.token_expires_in = kwargs.get('token_expires_in', 7 * 24 * 60 * 60)
-        self.token_key = f"{service_name}_token"
         logger.debug("TokenManager initialized.")
 
     def reset(self):
@@ -312,7 +311,7 @@ class TokenManager(Manager):
         Reset the keyring for the service.
         """
         try:
-            keyring.delete_password(self.service_name, self.token_key)
+            self.store.delete_password(self.service_name, 'token')
         except keyring.errors.PasswordDeleteError:
             pass
 
@@ -342,7 +341,7 @@ class TokenManager(Manager):
         :rtype: Optional[str]
         """
         token = None
-        if encoded_token := keyring.get_password(self.service_name, self.token_key):
+        if encoded_token := self.store.get_password(self.service_name, 'token'):
             token = self._decode(encoded_token)
         
         if token is None:
@@ -361,7 +360,7 @@ class TokenManager(Manager):
         :type token: str
         """
         try:
-            keyring.set_password(self.service_name, self.token_key, self._encode(token, self.token_expires_in))
+            self.store.set_password(self.service_name, 'token', self._encode(token, self.token_expires_in))
             logger.debug("Token stored in keyring.")
         except Exception as e:
             logger.error(f"Failed to store token in keyring: {e}")
@@ -373,7 +372,7 @@ class TokenManager(Manager):
         :return: True if the token is expired, False otherwise.
         :rtype: bool
         """
-        if encoded_token := keyring.get_password(self.service_name, self.token_key):
+        if encoded_token := self.store.get_password(self.service_name, 'token'):
             if self._decode(encoded_token) is None:
                 logger.warning("Token is expired.")
                 return True

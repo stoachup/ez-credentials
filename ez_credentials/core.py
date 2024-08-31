@@ -289,7 +289,7 @@ class CredentialManager(Manager):
             return self.as_uri()
         if kwargs.get('as_dict', False):
             return self.as_dict()
-        if kwargs.get('as_tuple', True):
+        else: # return as tuple
             return self.as_tuple()
 
 
@@ -384,6 +384,18 @@ class TokenManager(Manager):
 
     is_expired = is_token_expired
 
+    def as_dict(self, with_key: str = 'token') -> Dict[str, str]:
+        """
+        Return the credentials as a dictionary.
+
+        :param with_key: The key to use for the token in the dictionary.
+        :type with_key: str
+        :return: The credentials as dictionary.
+        :rtype: Dict[str, str]
+        """
+        logger.debug(f"Returning credentials as dictionary with key {with_key}.")
+        return { with_key: self.token }
+
     def __call__(self, **kwargs) -> str | Dict[str, str]:
         """
         Return the token as a string or dictionary.
@@ -392,11 +404,9 @@ class TokenManager(Manager):
         :return: The token as a string or dictionary.
         :rtype: str or Dict[str, str]
         """
-        if kwargs.get('as_dict', False):
-            logger.debug("Returning token as dictionary.")
-            return {kwargs.get('with_key', 'token'): self.token}
-        else:
-            logger.debug("Returning token as string.")
+        if kwargs.pop('as_dict', False):
+            return self.as_dict(**kwargs)
+        else: # return as string
             return self.token
 
 

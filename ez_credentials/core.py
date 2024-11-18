@@ -15,7 +15,7 @@ import jwt
 import getpass
 import requests
 from datetime import datetime, timedelta
-from typing import Tuple, Dict, Optional
+from typing import Any, Tuple, Dict, Optional
 from yarl import URL
 from loguru import logger
 
@@ -31,7 +31,7 @@ class Manager:
     :type service_name: str
     """
 
-    def __init__(self, service_name, **kwargs):
+    def __init__(self, service_name: str, **kwargs):
         self.service_name = service_name
         storing = kwargs.get('store', 'keyring')
         logger.debug(f"Using {storing} for storing credentials.")
@@ -52,7 +52,7 @@ class Manager:
 
         logger.debug(f"Access manager initialized for service: {self.service_name}")
 
-    def reset_salt(self):
+    def reset_salt(self) -> None:
         """
         Reset the keyring for the service.
         """
@@ -61,7 +61,7 @@ class Manager:
         except keyring.errors.PasswordDeleteError:
             pass
 
-    def _encode(self, value, expires_in):
+    def _encode(self, value: Any, expires_in: Optional[int] = None) -> Optional[str]:
         """
         Encode the value with an expiration date.
 
@@ -74,10 +74,9 @@ class Manager:
         """
         logger.debug(f"Encoding value with expiration in {expires_in} seconds.")
         try:
-            payload = {
-                'key': value,
-                'exp': datetime.utcnow() + timedelta(seconds=expires_in)
-            }
+            payload = { 'key': value }
+            if expires_in is not None:
+                payload['exp'] = datetime.utcnow() + timedelta(seconds=expires_in)
             encoded_jwt = jwt.encode(payload, self.salt, algorithm='HS256')
             logger.debug(f"Value encoded with expiration in {expires_in} seconds.")
             return encoded_jwt
@@ -88,7 +87,7 @@ class Manager:
             logger.exception(f"Failed to encode JWT: {e}")
             return None
 
-    def _decode(self, encoded_key):
+    def _decode(self, encoded_key: str) -> Optional[Any]:
         """
         Decode the JWT to retrieve the value.
 
@@ -117,12 +116,12 @@ class CredentialManager(Manager):
     :type service_name: str
     """
 
-    def __init__(self, service_name: str, **kwargs):
+    def __init__(self, service_name: str, expires_in: Optional[int] = None, **kwargs):
         Manager.__init__(self, service_name, **kwargs)
-        self.credential_expires_in = kwargs.get('credential_expires_in', kwargs.get('expires_in', 30 * 24 * 60 * 60))
+        self.credential_expires_in = expires_in or kwargs.get('credential_expires_in', 30 * 24 * 60 * 60)
         logger.debug(f"CredentialManager initialized ({self.credential_expires_in}s).")
 
-    def reset_password(self):
+    def reset_password(self) -> None:
         """
         Reset the keyring for the password.
         """
@@ -131,7 +130,7 @@ class CredentialManager(Manager):
         except keyring.errors.PasswordDeleteError:
             pass
 
-    def reset_username(self):
+    def reset_username(self) -> None:
         """
         Reset the keyring for the username, which implies resetting the password.
         """
@@ -168,7 +167,7 @@ class CredentialManager(Manager):
         return username
 
     @username.setter
-    def username(self, value):
+    def username(self, value: str) -> None:
         """
         Set the username and delete the existing password if the username changes.
 
@@ -185,7 +184,7 @@ class CredentialManager(Manager):
         except Exception as e:
             logger.error(f"Failed to store username in keyring: {e}")
 
-    def prompt_for_password(self) -> None:
+    def prompt_for_password(self) -> str:
         """
         Prompt the user for a password if not already set.
         """
@@ -214,7 +213,7 @@ class CredentialManager(Manager):
         return password
 
     @password.setter
-    def password(self, value):
+    def password(self, value: str) -> None:
         """
         Set the password, encoding it with an expiration date.
 
@@ -301,10 +300,13 @@ class TokenManager(Manager):
     :type service_name: str
     """
 
-    def __init__(self, service_name: str, **kwargs):
+    def __init__(self, service_name: str, expires_in: Optional[int] = None, **kwargs):
         Manager.__init__(self, service_name, **kwargs)
-        self.token_expires_in = kwargs.get('token_expires_in', 7 * 24 * 60 * 60)
-        logger.debug("TokenManager initialized.")
+        self.token_expires_in = expires_in or kwargs.get('token_expires_in', None)
+        if self.token_expires_in is None:
+            logger.warning("TokenManager initiated with a non-expiring token. Be careful!")
+        else:
+            logger.debug("TokenManager initialized.")
 
     def reset(self):
         """
@@ -352,7 +354,7 @@ class TokenManager(Manager):
         return token
 
     @token.setter
-    def token(self, token):
+    def token(self, token: str) -> None:
         """
         Set the token, encoding it with an expiration date.
 
@@ -433,7 +435,7 @@ class TokenCredentialManager(CredentialManager, TokenManager):
         CredentialManager.reset(self)
         PromptedTokenManager.reset(self)
 
-    def __call__(self, **kwargs) -> Tuple[Optional[str], Optional[str]] or str or Dict[str, str]:
+    def __call__(self, **kwargs) -> Tuple[Optional[str], Optional[str]] | str | Dict[str, str]:
         """
         Return credentials or token based on expiration and input parameters.
 
@@ -579,7 +581,7 @@ class WebServiceTokenCredentialManager(CredentialManager, WebServiceTokenManager
         logger.debug(f"Checked expiration status: {expired}")
         return expired
 
-    def __call__(self, **kwargs) -> str or Dict[str, str]:
+    def __call__(self, **kwargs) -> str | Dict[str, str]:
         """
         Return token and get a new one if needed.
 

@@ -116,9 +116,9 @@ class CredentialManager(Manager):
     :type service_name: str
     """
 
-    def __init__(self, service_name: str, expires_in: Optional[int] = None, **kwargs):
+    def __init__(self, service_name: str, expires_in: Optional[int] = 7 * 24 * 60 * 60, **kwargs):
         Manager.__init__(self, service_name, **kwargs)
-        self.credential_expires_in = expires_in or kwargs.get('credential_expires_in', 30 * 24 * 60 * 60)
+        self.credential_expires_in = kwargs.get('credential_expires_in', expires_in)
         logger.debug(f"CredentialManager initialized ({self.credential_expires_in}s).")
 
     def reset_password(self) -> None:
@@ -300,13 +300,10 @@ class TokenManager(Manager):
     :type service_name: str
     """
 
-    def __init__(self, service_name: str, expires_in: Optional[int] = None, **kwargs):
+    def __init__(self, service_name: str, expires_in: Optional[int] = 30 * 24 * 60 * 60, **kwargs):
         Manager.__init__(self, service_name, **kwargs)
-        self.token_expires_in = expires_in or kwargs.get('token_expires_in', None)
-        if self.token_expires_in is None:
-            logger.warning("TokenManager initiated with a non-expiring token. Be careful!")
-        else:
-            logger.debug("TokenManager initialized.")
+        self.token_expires_in = kwargs.get('token_expires_in', expires_in)
+        logger.debug("TokenManager initialized.")
 
     def reset(self):
         """
